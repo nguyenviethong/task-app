@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+out
+release
+AppCopy
+*.exe
+*.zip
+*.asarnode_modules
+public.pem

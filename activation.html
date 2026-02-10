@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<body style="font-family:sans-serif;padding:30px">
+
+<h2>🔐 Kích hoạt bản quyền</h2>
+
+<input id="license" style="width:100%;"/>
+
+<br><br>
+
+<button onclick="activate()">Activate</button>
+
+<div id="status" style="margin-top:15px;font-weight:bold"></div>
+
+<script>
+async function activate() {
+  const text = document.getElementById("license").value;
+  const status = document.getElementById("status");
+  if (!text?.trim()) {
+    status.innerText = "⚠ License không hợp lệ!";
+    status.style.color = "orange";
+    license.focus();
+    return false;
+  }
+  try {
+    //const payload = JSON.parse(text);
+    const valueOk = await window.api.activateOnline(text);
+	
+	const result = valueOk;
+	
+	const ok = typeof result === "object" && result !== null && "ok" in result && result.ok === true;
+	
+    if (ok) {
+      status.innerText = "✅ Kích hoạt thành công! Hệ thống đang khởi động lại. Vui lòng chờ!";
+      status.style.color = "green";
+	  setTimeout(() => {
+		window.api.restart();
+	  }, 800);
+    } else {
+      status.innerText = "❌ License sai!";
+      status.style.color = "red";
+    }
+
+  } catch (e) {
+    status.innerText = "⚠ License không hợp lệ!";
+    status.style.color = "orange";
+  }
+}
+</script>
+
+</body>
+</html>
