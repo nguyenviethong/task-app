@@ -2,10 +2,20 @@ const fs = require("fs");
 const crypto = require("crypto");
 const path = require("path");
 const { fingerprint } = require("./machine");
+const { app } = require("electron");
 
 const LICENSE_PATH = path.join(process.env.APPDATA, "myapp.lic");
 
-const PUBLIC_KEY = fs.readFileSync("./public.pem", "utf8");
+//const PUBLIC_KEY = fs.readFileSync("./public.pem", "utf8");
+let pemPath;
+if (app.isPackaged) {
+  // chạy app build
+  pemPath = path.join(process.resourcesPath, "public.pem");
+} else {
+  // chạy dev
+  pemPath = path.join(__dirname, "../public.pem");
+}
+const PUBLIC_KEY = fs.readFileSync(pemPath, "utf8");
 
 function verifyLicense() {
   if (!fs.existsSync(LICENSE_PATH)) return { valid: false };

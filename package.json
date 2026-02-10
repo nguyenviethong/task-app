@@ -1,6 +1,6 @@
 {
   "name": "task-manager",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "",
   "main": "main/main.js",
   "scripts": {
@@ -40,6 +40,12 @@
   },
   "build": {
     "appId": "com.todo.app",
+	"extraResources": [
+		{
+		  "from": "public.pem",
+		  "to": "public.pem"
+		}
+	],
     "productName": "Task Manager By ITHONG",
 	"publish": [
       {
