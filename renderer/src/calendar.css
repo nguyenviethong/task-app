@@ -1,0 +1,9 @@
+.rbc-calendar {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.rbc-agenda-view {
+  white-space: normal;
+}

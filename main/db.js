@@ -20,6 +20,16 @@ CREATE TABLE IF NOT EXISTS tasks (
 )
 `).run();
 
+db.exec(`
+CREATE TABLE IF NOT EXISTS tracking_sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  taskId INTEGER NOT NULL,
+  startAt INTEGER NOT NULL,
+  endAt INTEGER NOT NULL,
+  FOREIGN KEY(taskId) REFERENCES tasks(id)
+);
+`);
+
 // helper check column
 function addColumnIfNotExists(column, type) {
   const cols = db.prepare(`PRAGMA table_info(tasks)`).all();
@@ -41,6 +51,11 @@ addColumnIfNotExists("createdAt", "INTEGER");
 addColumnIfNotExists("reminderNotified", "INTEGER");
 addColumnIfNotExists("priority", "TEXT");
 addColumnIfNotExists("completedAt", "INTEGER");
+//TIME TRACKING
+addColumnIfNotExists("actualStart", "INTEGER");
+addColumnIfNotExists("actualEnd", "INTEGER");
+addColumnIfNotExists("totalTimeSpent", "INTEGER DEFAULT 0");
+addColumnIfNotExists("isTracking", "INTEGER DEFAULT 0");
 
 
 // --------------------

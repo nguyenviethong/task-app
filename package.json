@@ -1,6 +1,6 @@
 {
   "name": "task-manager",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "",
   "main": "main/main.js",
   "scripts": {
@@ -28,6 +28,7 @@
     "date-fns": "^4.1.0",
     "electron-updater": "^6.7.3",
     "fuse.js": "^7.1.0",
+    "json2csv": "^6.0.0-alpha.2",
     "react": "^19.2.4",
     "react-big-calendar": "^1.19.4",
     "react-calendar-heatmap": "^1.10.0",
@@ -36,21 +37,21 @@
     "react-date-range": "^2.0.1",
     "react-dom": "^19.2.4",
     "react-hot-toast": "^2.6.0",
-    "react-window": "^2.2.6"
+    "react-window": "^2.2.6",
+    "recharts": "^3.7.0"
   },
   "build": {
     "appId": "com.todo.app",
-	"extraResources": [
-		{
-		  "from": "public.pem",
-		  "to": "public.pem"
-		}
-	],
+    "extraResources": [
+      {
+        "from": "public.pem",
+        "to": "public.pem"
+      }
+    ],
     "productName": "Task Manager By ITHONG",
-	"publish": [
+    "publish": [
       {
         "provider": "github",
-		
         "owner": "nguyenviethong",
         "repo": "task-app"
       }

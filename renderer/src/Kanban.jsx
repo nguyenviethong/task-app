@@ -1,5 +1,5 @@
 import React from "react";
-import { useEffect,useState } from "react";
+import { useEffect,useState, useMemo } from "react";
 import {
   DragDropContext,
   Droppable,
@@ -8,11 +8,41 @@ import {
 
 const api = window.api;
 
-export default function Kanban({ tasks, styles, isQuanHan, priorityColor, deadlineText, isLate, onMove, formatDateVN }) {
-	
-  const late = tasks.filter(t => t.done !== 1 && isQuanHan(t));
-  const done = tasks.filter(t => t.done === 1);
-  const todo = tasks.filter(t => t.done === 0 && !isQuanHan(t));
+export default function Kanban({ tasks, styles, isQuanHan, priorityColor, deadlineText, isLate, onMove, formatDateVN, formatVN }) {
+  
+  const today = new Date().toISOString().split("T")[0];
+  const [kanbanDate, setKanbanDate] = useState(today);
+  const filtered   = useMemo(() => {
+	  const startDay = new Date(kanbanDate);
+	  startDay.setHours(0, 0, 0, 0);
+
+	  const endDay = new Date(kanbanDate);
+	  endDay.setHours(23, 59, 59, 999);
+	  
+	  return tasks
+		.filter(t => {
+		  if (kanbanDate) {
+			const start = startDay.getTime();
+			const end = endDay.getTime();
+
+			const s = t.startAt;
+			const e = t.endAt;
+
+			if (e) {
+			  if (!(s <= end && e >= start)) return false;
+			} else {
+			  if (s >= end) return false;
+			}
+		  }
+
+		  return true;
+		})
+		.sort((a, b) => b.createdAt - a.createdAt);
+	}, [tasks, kanbanDate]);
+  
+  const late = filtered.filter(t => t.done !== 1 && isQuanHan(t));
+  const done = filtered.filter(t => t.done === 1);
+  const todo = filtered.filter(t => t.done === 0 && !isQuanHan(t));
 
   //const columns = [
   //  { name: "Đang làm (còn hạn)", items: todo },
@@ -35,7 +65,7 @@ export default function Kanban({ tasks, styles, isQuanHan, priorityColor, deadli
 		done: { name: "Hoàn thành", items: done },
 		late: { name: "Quá hạn", items: late }
 	  });
-  }, [tasks]);
+  }, [filtered]);
   
  async function onDragEnd(result) {
     if (!result.destination) return;
@@ -71,8 +101,48 @@ export default function Kanban({ tasks, styles, isQuanHan, priorityColor, deadli
 	await api.moveTask(item.id, newState);
 	
   }
+  
+  function shiftDate(days) {
+	  if (!kanbanDate) return;
+
+	  const d = new Date(kanbanDate);
+	  d.setDate(d.getDate() + days);
+
+	  const str = d.toISOString().split("T")[0];
+	  setKanbanDate(str);
+  }
 
   return (
+	<div style={{ marginBottom: 12 }}>
+	  <div style={styles.dateRowKanban}>
+				 <button
+					style={styles.dateBtn}
+					onClick={() => shiftDate(-1)}
+				  >
+					◀
+				 </button>
+				<div style={{ textAlign: "center" }}>
+					<input
+					  type="date"
+					  value={kanbanDate}
+					  onChange={e => setKanbanDate(e.target.value)}
+					  style={styles.input}
+					/>
+					<div style={styles.datePreview}>
+					  {formatVN(kanbanDate)}
+					</div>
+				 </div>
+				 
+				
+				  <button
+				style={styles.dateBtn}
+				onClick={() => shiftDate(1)}
+			  >
+				▶
+			  </button>
+
+	</div>
+	
     <DragDropContext onDragEnd={onDragEnd}>
       <div style={styles.kanbanBoard}>
         {Object.entries(state).map(([id, col]) => (
@@ -130,6 +200,8 @@ export default function Kanban({ tasks, styles, isQuanHan, priorityColor, deadli
         ))}
       </div>
     </DragDropContext>
+	
+	</div>
   );
   
 }

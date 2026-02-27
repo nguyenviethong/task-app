@@ -176,9 +176,7 @@ export default function Dashboard({ tasks }) {
 	  borderRadius: 12,
 	  boxShadow: "0 10px 30px rgba(0,0,0,0.5)"
 	}}>
-      <h2>📊 Thống kê</h2>
-	  
-		 
+        <h2>📊 Thống kê</h2>
 			<div style={{
 			  background: "#222",
 			  padding: 10,
