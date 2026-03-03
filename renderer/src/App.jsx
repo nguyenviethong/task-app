@@ -21,6 +21,7 @@ import AISidebar from "./AISidebar";
 import LoginModal from "./LoginModal";
 import QuotaPopup from "./QuotaPopup";
 import Dashboard2 from "./Dashboard2.jsx";
+import useTasks from "./hooks/useTasks";
 
 //import Login from "./pages/Login";
 
@@ -47,25 +48,42 @@ export default function App() {
 	//	   />;
   //}
   
-  const [usage, setUsage] = useState(0);
   const [licenseExpired, setLicenseExpired] = useState(false);
-  
-  const [restarting, setRestarting] = useState(false);
   const [licenseKey, setLicenseKey] = useState("");
-  const [activating, setActivating] = useState(false);
-  const [showActivation, setShowActivation] = useState(false);
-  
   const [licenseInfo, setLicenseInfo] = useState(null);
+  const [activating, setActivating] = useState(false);
+  const [restarting, setRestarting] = useState(false);
+  
+  
+  
+  const [usage, setUsage] = useState(0);
+  
+  const [showActivation, setShowActivation] = useState(false);
   
   const [jumpTo, setJumpTo] = useState(null);
 	
   const [showNotify, setShowNotify] = useState(false);
   
   const today = new Date().toISOString().split("T")[0];
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [dateFilter, setDateFilter] = useState(today);
-  const [nameFilter, setNameFilter] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState("all");
+  //const [typeFilter, setTypeFilter] = useState("all");
+  //const [dateFilter, setDateFilter] = useState(today);
+  //const [nameFilter, setNameFilter] = useState("");
+  //const [priorityFilter, setPriorityFilter] = useState("all");
+  
+const {
+  tasks,
+  filtered,
+  load,
+
+  typeFilter,
+  setTypeFilter,
+  priorityFilter,
+  setPriorityFilter,
+  nameFilter,
+  setNameFilter,
+  dateFilter,
+  setDateFilter
+} = useTasks(api);
 
 	
   const [editing, setEditing] = useState(null);
@@ -81,45 +99,18 @@ export default function App() {
   
   const [error, setError] = useState("");
   
-  const [tasks, setTasks] = useState([]);
+  //const [tasks, setTasks] = useState([]);
   
-const filtered = useMemo(() => {
-  return tasks
-    .filter(t => {
-      if (typeFilter !== "all" && t.type !== typeFilter) return false;
-      if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
+  const [selectedTasks, setSelectedTasks] = useState([]);
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [copyDate, setCopyDate] = useState("");
+  
 
-      if (
-        nameFilter &&
-        !normalizeVN(t.title)
-          .toLowerCase()
-          .includes(normalizeVN(nameFilter).toLowerCase())
-      ) return false;
 
-      if (dateFilter) {
-        const startDay = new Date(dateFilter);
-        startDay.setHours(0, 0, 0, 0);
-
-        const endDay = new Date(dateFilter);
-        endDay.setHours(23, 59, 59, 999);
-
-        const start = startDay.getTime();
-        const end = endDay.getTime();
-
-        const s = t.startAt;
-        const e = t.endAt;
-
-        if (e) {
-          if (!(s <= end && e >= start)) return false;
-        } else {
-          if (s >= end) return false;
-        }
-      }
-
-      return true;
-    })
-    .sort((a, b) => b.createdAt - a.createdAt);
-}, [tasks, typeFilter, priorityFilter, nameFilter, dateFilter]);
+useEffect(() => {
+  setSelectedTasks([]);
+  setShowCopyModal(false);
+}, [typeFilter, priorityFilter, nameFilter, dateFilter]);
   
   
   const total = filtered.length;
@@ -134,13 +125,7 @@ const filtered = useMemo(() => {
 	priority: "medium"
   });
 
-const load = useCallback(async () => {
-  try {
-    setTasks(await api.getTasks());
-  } catch {
-    setError("Không tải được dữ liệu");
-  }
-}, []);
+
 	
 	
 useEffect(() => {
@@ -170,7 +155,6 @@ useEffect(() => {
 
   return () => clearInterval(timer);
 }, []);
-
 
 
   const add = async () => {
@@ -212,6 +196,8 @@ useEffect(() => {
 
 	  return format(d, "dd/MM/yyyy HH:mm:ss");
 	};
+	
+
   
   const typeLabel = {
 	  personal: "Cá nhân",
@@ -730,6 +716,35 @@ if (licenseExpired) {
   );
 }
 
+
+const modalOverlayStyle = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,0.5)",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 999
+};
+
+const modalStyle = {
+  background: "#1e1e1e",
+  padding: 20,
+  borderRadius: 12,
+  width: 500,
+  maxHeight: "70vh",
+  overflowY: "auto",
+  color: "white"
+};
+
+const sessionRowStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  padding: "8px 0",
+  borderBottom: "1px solid #333",
+  fontSize: 13
+};
+
 return (
 
 
@@ -989,6 +1004,7 @@ return (
 						  onChange={e => setForm({ ...form, startAt: e.target.value })}
 						  style={styles.input}
 						/>
+						
 
 						<input
 						  type="datetime-local"
@@ -1088,10 +1104,34 @@ return (
 
 					  <div style={styles.card}>
 						  
-						<h3>📌 Danh sách công việc</h3>
-						  
+						<div style={{
+						  display: "flex",
+						  justifyContent: "space-between",
+						  alignItems: "center",
+						  marginBottom: 12
+						}}>
+						  <h3 style={{ margin: 0 }}>📌 Danh sách công việc</h3>
 
-						<div style={styles.list}>
+						  {selectedTasks.length > 0 && (
+							<button
+							  onClick={() => setShowCopyModal(true)}
+							  style={{
+								padding: "6px 12px",
+								borderRadius: 6,
+								background: "#2196f3",
+								color: "white",
+								border: "none",
+								cursor: "pointer"
+							  }}
+							>
+							  📋 Copy ({selectedTasks.length})
+							</button>
+						  )}
+						</div>
+						
+						
+						<div style={styles.list}>						
+
 						  
 						  {filtered.map((t, i) => (
 								<TaskItem
@@ -1120,12 +1160,92 @@ return (
 								  StatusBadge={StatusBadge}
 								  jumpTo={jumpTo}
 								  taskRefs={taskRefs}
+								  selectedTasks={selectedTasks}
+								  setSelectedTasks={setSelectedTasks}
 								/>
 						  ))}
 						  
 						  
 						</div>
 						
+						{showCopyModal && (
+							  <div style={modalOverlayStyle}>
+								<div style={modalStyle}>
+								  <h3>📅 Copy công việc sang ngày khác</h3>
+								  
+								      {/* PREVIEW */}
+									  <div style={{
+										maxHeight: 150,
+										overflowY: "auto",
+										marginBottom: 16,
+										padding: 10,
+										background: "#1e1e1e",
+										borderRadius: 8
+									  }}>
+										{filtered
+										  .filter(t => selectedTasks.includes(t.id))
+										  .map(t => (
+											<div key={t.id} style={{ marginBottom: 6 }}>
+											  ✓ {t.title}
+											</div>
+										))}
+									  </div>
+
+								      {/* DATE */}
+									  <div style={{ marginBottom: 12 }}>
+										<input
+										  type="date"
+										  value={copyDate}
+										  onChange={e => setCopyDate(e.target.value)}
+										  style={{
+											
+											padding: 8,
+											borderRadius: 8,
+											border: "1px solid #333",
+											
+										  }}
+										/>
+									  </div>
+									  
+									  
+
+								  <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+									<button onClick={() => setShowCopyModal(false)}>
+									  Hủy
+									</button>
+
+									<button
+									  onClick={async () => {
+										if (!copyDate || selectedTasks.length === 0) {
+										  toast.error("Vui lòng chọn task và ngày copy");
+										  return;
+										}
+										try {
+											await api.copyTasks(selectedTasks, copyDate);
+											
+											//setSelectedTasks([]);
+											setShowCopyModal(true);
+											load();
+											toast.success("Copy thành công");
+										} catch (error) {
+										  toast.error("Copy thất bại ❌");
+										}
+										
+									  }}
+									  style={{
+										background: "#4caf50",
+										color: "white",
+										border: "none",
+										padding: "6px 12px",
+										borderRadius: 6
+									  }}
+									>
+									  Copy
+									</button>
+								  </div>
+								</div>
+							  </div>
+							)}
 						
 						
 						
@@ -1273,8 +1393,8 @@ const styles = {
 	
 	  overflowY: "auto",
 	  border: "1px solid #333",
-	  padding: 8,
-	    maxHeight: "60vh",
+	  padding: 5,
+	    maxHeight: "100vh",
   overflowY: "auto",
   scrollbarWidth: "thin"
   },

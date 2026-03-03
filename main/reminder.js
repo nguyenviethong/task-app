@@ -1,4 +1,4 @@
-const { Notification } = require("electron");
+const { app, Notification } = require("electron");
 const { db } = require("./db");
 
 function notify(task, type) {
@@ -30,6 +30,7 @@ function snooze(task) {
 }
 
 function check() {
+  console.log("check overdue");
   const now = Date.now();
 
   const tasks = db.prepare(`SELECT * FROM tasks`).all();
@@ -73,7 +74,11 @@ function check() {
   });
 }
 
-setInterval(check, 60000);
-check();
+app.whenReady().then(() => {
+
+  setInterval(check, 60000)
+  check()
+
+})
 
 module.exports = {};

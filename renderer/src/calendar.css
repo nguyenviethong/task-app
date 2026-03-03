@@ -7,3 +7,19 @@
 .rbc-agenda-view {
   white-space: normal;
 }
+
+
+
+
+.custom-input {
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  width: 100%;
+  font-size: 14px;
+  outline: none;
+}
+
+.custom-input:focus {
+  border-color: #1976d2;
+}

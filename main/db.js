@@ -40,6 +40,30 @@ function addColumnIfNotExists(column, type) {
   }
 }
 
+function addColumnIfNotExistsTrackingSessions(column, type) {
+  const cols = db.prepare(`PRAGMA table_info(tracking_sessions)`).all();
+  const exists = cols.some(c => c.name === column);
+
+  if (!exists) {
+    db.prepare(`ALTER TABLE tracking_sessions ADD COLUMN ${column} ${type}`).run();
+  }
+}
+
+function addIndexIfNotExists(indexName, table, column) {
+  const indexes = db.prepare(`
+    PRAGMA index_list(${table})
+  `).all();
+
+  const exists = indexes.some(i => i.name === indexName);
+
+  if (!exists) {
+    db.prepare(`
+      CREATE INDEX ${indexName}
+      ON ${table} (${column})
+    `).run();
+  }
+}
+
 // migrations
 addColumnIfNotExists("type", "TEXT");
 addColumnIfNotExists("startAt", "INTEGER");
@@ -56,6 +80,24 @@ addColumnIfNotExists("actualStart", "INTEGER");
 addColumnIfNotExists("actualEnd", "INTEGER");
 addColumnIfNotExists("totalTimeSpent", "INTEGER DEFAULT 0");
 addColumnIfNotExists("isTracking", "INTEGER DEFAULT 0");
+//SYNC
+addColumnIfNotExists("updatedAt", "INTEGER");
+addColumnIfNotExists("deletedAt", "INTEGER");
+addColumnIfNotExists("syncStatus", "TEXT DEFAULT 'synced'");
+addColumnIfNotExists("uuid", "TEXT");
+// values: 'synced' | 'dirty' | 'deleted'
+
+//tracking_sessions
+addColumnIfNotExistsTrackingSessions("updatedAt", "INTEGER");
+addColumnIfNotExistsTrackingSessions("deletedAt", "INTEGER");
+addColumnIfNotExistsTrackingSessions("syncStatus", "TEXT DEFAULT 'synced'");
+
+//tạo index
+addIndexIfNotExists("idx_tasks_syncStatus", "tasks", "syncStatus");
+addIndexIfNotExists("idx_tasks_startAt", "tasks", "startAt");
+addIndexIfNotExists("idx_tasks_createdAt", "tasks", "createdAt");
+addIndexIfNotExists("idx_tasks_type", "tasks", "type");
+addIndexIfNotExists("idx_tasks_priority", "tasks", "priority");
 
 
 // --------------------

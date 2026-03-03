@@ -99,15 +99,21 @@ app.whenReady().then(() => {
 });
 
 ipcMain.handle('getTasks', () => {
-  return db.prepare('SELECT * FROM tasks').all();
+  return db.prepare(`SELECT * FROM tasks where syncStatus != 'deleted' `).all();
 });
 
-ipcMain.handle('addTask', (_, task) =>
-  db.prepare(`
-    INSERT INTO tasks(type,title,startAt,endAt,createdAt,priority,done)
-    VALUES (?,?,?,?,?,?,0)
-  `).run(task.type, task.title, task.startAt, task.endAt,Date.now(),task.priority)
-);
+ipcMain.handle('addTask', (_, task) => {
+
+  const now = Date.now();
+  const uuid = crypto.randomUUID();
+  const info = db.prepare(`
+    INSERT INTO tasks(type,title,startAt,endAt,createdAt,updatedAt,syncStatus,priority,uuid,done)
+    VALUES (?,?,?,?,?,?,'dirty',?,?,0)
+  `).run(task.type, task.title, task.startAt, task.endAt,now,now,task.priority,uuid);
+  
+   //return db.prepare("SELECT * FROM tasks WHERE id = ?")
+   //        .get(info.lastInsertRowid);
+});
 
 ipcMain.handle('toggleTask', (_, id) => {
   //db.prepare('UPDATE tasks SET done = NOT done WHERE id=?').run(id);
@@ -154,6 +160,73 @@ ipcMain.handle('deleteTask', (_, id) => {
   db.prepare('DELETE FROM tracking_sessions WHERE taskId=?').run(id);
   
   db.prepare('DELETE FROM tasks WHERE id=?').run(id);
+  
+    //const now = Date.now();
+
+	  //db.prepare(`
+		//UPDATE tasks
+		//SET deletedAt = ?,
+		//	syncStatus = 'deleted'
+		//WHERE id = ?
+	  //`).run(now, id);
+  
+});
+
+
+
+ipcMain.handle('copyTasks', async (event, { taskIds, targetDate }) => {
+  const target = new Date(targetDate);
+  const now = Date.now();
+  
+  const getStmt = db.prepare(`
+    SELECT * FROM tasks WHERE id = ?
+  `);
+
+  const insertStmt = db.prepare(`
+    INSERT INTO tasks(type,title,startAt,endAt,createdAt,updatedAt,syncStatus,priority,uuid,done)
+    VALUES (?,?,?,?,?,?,'dirty',?,?,0)
+  `);
+
+  for (let id of taskIds) {
+
+    const task = getStmt.get(id);
+    if (!task) continue;
+
+    // ===== Giữ nguyên giờ =====
+    let newStart = null;
+    let newEnd = null;
+
+    if (task.startAt) {
+      const originalStart = new Date(task.startAt);
+      newStart = new Date(target);
+      newStart.setHours(
+        originalStart.getHours(),
+        originalStart.getMinutes()
+      );
+    }
+
+    if (task.endAt) {
+      const originalEnd = new Date(task.endAt);
+      newEnd = new Date(target);
+      newEnd.setHours(
+        originalEnd.getHours(),
+        originalEnd.getMinutes()
+      );
+    }
+
+    insertStmt.run(
+      task.type,
+      task.title,
+      newStart ? newStart.getTime() : null,
+      newEnd ? newEnd.getTime() : null,
+      now,
+      now,
+      task.priority,
+      crypto.randomUUID()
+    );
+  }
+
+  return true;
 });
 
 ipcMain.handle('setReminder', (_, id, time) => {
@@ -166,9 +239,11 @@ ipcMain.handle("updateTask", (_, id, data) => {
     UPDATE tasks
     SET title = ?,
         startAt = ?,
-        endAt = ?
+        endAt = ?,
+		updatedAt = ?,
+        syncStatus = 'dirty'
     WHERE id = ?
-  `).run(title, startAt || null, endAt || null, id);
+  `).run(title, startAt || null, endAt || null, Date.now(), id);
 
   return true;
 });
@@ -180,12 +255,63 @@ ipcMain.handle("moveTask", (_, id, newState) => {
   
   db.prepare(`
     UPDATE tasks
-    SET done = ?, completedAt = ?
+    SET done = ?, completedAt = ?, updatedAt = ?, syncStatus = 'dirty'
     WHERE id = ?
-  `).run(newState, completedAt, id);
+  `).run(newState, completedAt, Date.now(), id);
 
   return true;
 });
+
+let isSyncing = false;
+
+async function syncToServer() {
+  if (isSyncing) return;
+  isSyncing = true;
+
+  try {
+    const dirtyTasks = db.prepare(`
+      SELECT * FROM tasks
+      WHERE syncStatus != 'synced'
+    `).all();
+
+    if (dirtyTasks.length === 0) {
+      isSyncing = false;
+      return;
+    }
+
+    const response = await fetch(url + "/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tasks: dirtyTasks })
+    });
+
+    if (!response.ok) throw new Error("Server error");
+
+    const result = await response.json();
+
+    if (result.successIds?.length) {
+      const stmt = db.prepare(`
+        UPDATE tasks SET syncStatus = 'synced'
+        WHERE id = ?
+      `);
+
+      const transaction = db.transaction((ids) => {
+        ids.forEach(id => stmt.run(id));
+      });
+
+      transaction(result.successIds);
+    }
+
+    console.log("Sync success");
+
+  } catch (err) {
+    console.log("Sync failed:", err.message);
+  }
+
+  isSyncing = false;
+}
+
+//setInterval(syncToServer, 10000);
 
 ipcMain.handle("snooze", (_, id, until) => {
   db.prepare(`
@@ -569,38 +695,52 @@ ipcMain.handle("pauseTracking", (_, taskId) => {
   trx();
 });
 
+function getLatestTrackingSessionByTaskId(taskId) {
+  return db.prepare(`
+    SELECT id, startAt, endAt
+    FROM tracking_sessions
+    WHERE taskId = ?
+    ORDER BY startAt DESC
+    LIMIT 1
+  `).get(taskId);
+}
+
 ipcMain.handle("stopTracking", (_, taskId) => {
   const task = db.prepare(`SELECT * FROM tasks WHERE id=?`).get(taskId);
   if (!task) return;
-  
     const now = Date.now();
 
 	  const trx = db.transaction(() => {
-
+		
+		let duration = 0;
+		let actualStartSave = null;
 		if (task.isTracking && task.actualStart) {
-		  const duration = now - task.actualStart;
-
-		  db.prepare(`
+		  duration = now - task.actualStart;
+		  actualStartSave = task.actualStart;		  
+		}else{
+			//tìm xem đã có tracking hay chưa
+			const latestTracking = getLatestTrackingSessionByTaskId(taskId);
+			actualStartSave = task.startAt;
+			if(latestTracking){
+				actualStartSave = latestTracking.endAt ?? latestTracking.startAt;
+			}
+			duration = now - actualStartSave;
+		}
+		db.prepare(`
 			INSERT INTO tracking_sessions (taskId, startAt, endAt)
 			VALUES (?, ?, ?)
-		  `).run(taskId, task.actualStart, now);
-
-		  db.prepare(`
-			UPDATE tasks
-			SET totalTimeSpent = totalTimeSpent + ?
-			WHERE id = ?
-		  `).run(duration, taskId);
-		}
+		  `).run(taskId, actualStartSave, now);
 
 		db.prepare(`
-		  UPDATE tasks
-		  SET actualStart=NULL,
+			UPDATE tasks
+			SET totalTimeSpent = totalTimeSpent + ?,
+			  actualStart=NULL,
 			  isTracking=0,
 			  done=1,
 			  completedAt=?,
 			  actualEnd = ?
-		  WHERE id=?
-		`).run(now, now, taskId);
+			WHERE id = ?
+		  `).run(duration, now, now, taskId);
 
 	  });
 

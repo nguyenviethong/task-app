@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('api', {
   addTask: t => ipcRenderer.invoke('addTask', t),
   toggleTask: id => ipcRenderer.invoke('toggleTask', id),
   deleteTask: id => ipcRenderer.invoke('deleteTask', id),
+  copyTasks: (taskIds, targetDate) => ipcRenderer.invoke('copyTasks', { taskIds, targetDate }),
   setReminder: (id, t) => ipcRenderer.invoke('setReminder', id, t),
   updateTask: (id, data) => ipcRenderer.invoke("updateTask", id, data),
   snooze: (id, until) => ipcRenderer.invoke("snooze", id, until),

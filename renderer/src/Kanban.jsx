@@ -122,6 +122,8 @@ export default function Kanban({ tasks, styles, isQuanHan, priorityColor, deadli
 					◀
 				 </button>
 				<div style={{ textAlign: "center" }}>
+					
+
 					<input
 					  type="date"
 					  value={kanbanDate}
@@ -179,15 +181,23 @@ export default function Kanban({ tasks, styles, isQuanHan, priorityColor, deadli
                         
 	
                         {isLate(t) ? (
-                          <div style={{ color: "red" }}>
-                            🔴 Quá hạn
-                          </div>
-                        )  : t.endAt && (
-                          <div style={styles.meta}>
-                            ⏰ {deadlineText(t)}
-                          </div>
-                        )
-						}
+						  <>
+							{t.done && (
+							  <div style={styles.meta}>
+								⏰ Hoàn thành {formatDateVN(t.completedAt)}
+							  </div>
+							  
+							)}
+							<div style={{ color: "red" }}>🔴 Quá hạn</div>
+						  </>
+						) : t.endAt ? (
+						  <div style={styles.meta}>
+							{t.done ? "⏰ Hoàn thành " + formatDateVN(t.completedAt) : deadlineText(t)}
+						  </div>
+						) : null}
+						
+						
+						
                       </div>
                     )}
                   </Draggable>
