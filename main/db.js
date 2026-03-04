@@ -128,7 +128,7 @@ function startBackup() {
     } catch (e) {
       console.error("Backup failed:", e);
     }
-  }, 5 * 60 * 1000); // mỗi 5 phút
+  }, 30 * 60 * 1000); // mỗi 30 phút
 }
 
 startBackup();

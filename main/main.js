@@ -13,7 +13,7 @@ const file = path.join(app.getPath("userData"), "auth.json");
 const chatdb  = require('./chatdb');
 const { Parser } = require("json2csv");
 
-require('./reminder');
+const { startScheduler, reschedule } = require('./reminder');
 
 
 app.whenReady().then(() => {
@@ -98,6 +98,10 @@ app.whenReady().then(() => {
 
 });
 
+app.whenReady().then(() => {
+  startScheduler();
+});
+
 ipcMain.handle('getTasks', () => {
   return db.prepare(`SELECT * FROM tasks where syncStatus != 'deleted' `).all();
 });
@@ -111,6 +115,7 @@ ipcMain.handle('addTask', (_, task) => {
     VALUES (?,?,?,?,?,?,'dirty',?,?,0)
   `).run(task.type, task.title, task.startAt, task.endAt,now,now,task.priority,uuid);
   
+  reschedule(); // 🔥 cập nhật lại scheduler
    //return db.prepare("SELECT * FROM tasks WHERE id = ?")
    //        .get(info.lastInsertRowid);
 });
@@ -151,7 +156,7 @@ ipcMain.handle('toggleTask', (_, id) => {
 	
     WHERE id=?
   `).run(newState, completedAt,id);
-
+   reschedule(); // 🔥 cập nhật lại scheduler
   return newState;
   
 });
@@ -160,7 +165,7 @@ ipcMain.handle('deleteTask', (_, id) => {
   db.prepare('DELETE FROM tracking_sessions WHERE taskId=?').run(id);
   
   db.prepare('DELETE FROM tasks WHERE id=?').run(id);
-  
+  reschedule(); // 🔥 cập nhật lại scheduler
     //const now = Date.now();
 
 	  //db.prepare(`
@@ -225,12 +230,15 @@ ipcMain.handle('copyTasks', async (event, { taskIds, targetDate }) => {
       crypto.randomUUID()
     );
   }
-
+  
+  reschedule(); // 🔥 cập nhật lại scheduler
+  
   return true;
 });
 
 ipcMain.handle('setReminder', (_, id, time) => {
   db.prepare('UPDATE tasks SET remindAt=? WHERE id=?').run(time, id);
+  reschedule(); // 🔥 cập nhật lại scheduler
 });
 
 ipcMain.handle("updateTask", (_, id, data) => {
@@ -244,7 +252,8 @@ ipcMain.handle("updateTask", (_, id, data) => {
         syncStatus = 'dirty'
     WHERE id = ?
   `).run(title, startAt || null, endAt || null, Date.now(), id);
-
+  
+  reschedule(); // 🔥 cập nhật lại scheduler
   return true;
 });
 
@@ -319,6 +328,7 @@ ipcMain.handle("snooze", (_, id, until) => {
     SET snoozeUntil = ?
     WHERE id = ?
   `).run(until, id);
+  reschedule(); // 🔥 cập nhật lại scheduler
 });
 
 ipcMain.handle("exportTasks", async () => {
@@ -745,7 +755,7 @@ ipcMain.handle("stopTracking", (_, taskId) => {
 	  });
 
 	  trx();
-  
+	  reschedule(); // 🔥 cập nhật lại scheduler
   /*
   
 	  let total = task.totalTimeSpent;

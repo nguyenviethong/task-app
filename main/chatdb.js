@@ -90,7 +90,7 @@ function startBackup() {
     } catch (e) {
       console.error("Chat Backup failed:", e);
     }
-  }, 5 * 60 * 1000); // mỗi 5 phút
+  }, 60 * 60 * 1000); // mỗi 60 phút
 }
 
 startBackup();
